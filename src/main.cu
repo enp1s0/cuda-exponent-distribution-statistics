@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cu_exp_statistics.hpp>
 #include <cutf/experimental/fp.hpp>
+#include <cutf/memory.hpp>
 
 namespace {
 using count_t = unsigned long long int;
@@ -76,8 +77,8 @@ mtk::cu_exp_statistics::result_t mtk::cu_exp_statistics::take_matrix_statistics(
 	const std::size_t statistics_array_size = (1lu << cutf::experimental::fp::get_exponent_size<T>()) + 1;
 	count_t *dev_count;
 	count_t *hos_count;
-	cudaMalloc(&dev_count, sizeof(count_t) * statistics_array_size);
-	cudaMallocHost(&hos_count, sizeof(count_t) * statistics_array_size);
+	CUTF_CHECK_ERROR(cudaMalloc(&dev_count, sizeof(count_t) * statistics_array_size));
+	CUTF_CHECK_ERROR(cudaMallocHost(&hos_count, sizeof(count_t) * statistics_array_size));
 
 	const std::size_t size = m * n;
 	const auto block_size = 256;
@@ -86,8 +87,8 @@ mtk::cu_exp_statistics::result_t mtk::cu_exp_statistics::take_matrix_statistics(
 	init_array_kernel<<<grid_size, block_size, 0, cuda_stream>>>(dev_count, statistics_array_size);
 	statistics_kernel<<<grid_size, block_size, 0, cuda_stream>>>(dev_count, ptr, m, n, ld);
 
-	cudaMemcpyAsync(hos_count, dev_count, sizeof(count_t) * statistics_array_size, cudaMemcpyDefault, cuda_stream);
-	cudaStreamSynchronize(cuda_stream);
+	CUTF_CHECK_ERROR(cudaMemcpyAsync(hos_count, dev_count, sizeof(count_t) * statistics_array_size, cudaMemcpyDefault, cuda_stream));
+	CUTF_CHECK_ERROR(cudaStreamSynchronize(cuda_stream));
 
 	mtk::cu_exp_statistics::result_t result;
 	result.num_zero = hos_count[0];
@@ -101,10 +102,26 @@ mtk::cu_exp_statistics::result_t mtk::cu_exp_statistics::take_matrix_statistics(
 		}
 	}
 
-	cudaFreeHost(hos_count);
-	cudaFree(dev_count);
+	CUTF_CHECK_ERROR(cudaFreeHost(hos_count));
+	CUTF_CHECK_ERROR(cudaFree(dev_count));
 
 	return result;
+}
+
+std::string mtk::cu_exp_statistics::to_json(
+		const mtk::cu_exp_statistics::result_t& result
+		) {
+	std::string str = "{";
+	str += "num_zero:" + std::to_string(result.num_zero);
+
+	for (int exp = -10000; exp <= 10000; exp++) {
+		if (result.distribution.count(exp) != 0) {
+			str += ",\"" + std::to_string(exp) + "\":" + std::to_string(result.distribution.at(exp));
+		}
+	}
+	str += "}";
+
+	return str;
 }
 
 #define TAKE_MATRIX_STATISTICS_INSTANCE(type)\
