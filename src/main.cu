@@ -7,6 +7,15 @@ namespace {
 using count_t = unsigned long long int;
 
 template <class T>
+struct base_t {
+	using type = T;
+	static const unsigned num_elements = 1;
+};
+template <> struct base_t<double2> {using type = double;static const unsigned num_elements = 2;};
+template <> struct base_t<float2 > {using type = float; static const unsigned num_elements = 2;};
+template <> struct base_t<half2  > {using type = half;  static const unsigned num_elements = 2;};
+
+template <class T>
 __global__ void statistics_kernel(
 		count_t* const result_ptr,
 		const T* const ptr,
@@ -74,18 +83,18 @@ mtk::cu_exp_statistics::result_t mtk::cu_exp_statistics::take_matrix_statistics(
 		) {
 	const std::size_t ld = ld_ == 0 ? m : ld_;
 
-	const std::size_t statistics_array_size = (1lu << cutf::experimental::fp::get_exponent_size<T>()) + 1;
+	const std::size_t statistics_array_size = (1lu << cutf::experimental::fp::get_exponent_size<typename base_t<T>::type>()) + 1;
 	count_t *dev_count;
 	count_t *hos_count;
 	CUTF_CHECK_ERROR(cudaMalloc(&dev_count, sizeof(count_t) * statistics_array_size));
 	CUTF_CHECK_ERROR(cudaMallocHost(&hos_count, sizeof(count_t) * statistics_array_size));
 
-	const std::size_t size = m * n;
+	const std::size_t size = m * n * base_t<T>::num_elements;
 	const auto block_size = 256;
 	const auto grid_size = (size + block_size - 1) / block_size;
 
 	init_array_kernel<<<grid_size, block_size, 0, cuda_stream>>>(dev_count, statistics_array_size);
-	statistics_kernel<<<grid_size, block_size, 0, cuda_stream>>>(dev_count, ptr, m, n, ld);
+	statistics_kernel<<<grid_size, block_size, 0, cuda_stream>>>(dev_count, reinterpret_cast<const typename base_t<T>::type*>(ptr), m * base_t<T>::num_elements, n, ld * base_t<T>::num_elements);
 
 	CUTF_CHECK_ERROR(cudaMemcpyAsync(hos_count, dev_count, sizeof(count_t) * statistics_array_size, cudaMemcpyDefault, cuda_stream));
 	CUTF_CHECK_ERROR(cudaStreamSynchronize(cuda_stream));
@@ -93,10 +102,10 @@ mtk::cu_exp_statistics::result_t mtk::cu_exp_statistics::take_matrix_statistics(
 	mtk::cu_exp_statistics::result_t result;
 	result.num_zero = hos_count[0];
 
-	for (std::uint32_t i = 0; i < (1u << cutf::experimental::fp::get_exponent_size<T>()); i++) {
+	for (std::uint32_t i = 0; i < (1u << cutf::experimental::fp::get_exponent_size<typename base_t<T>::type>()); i++) {
 		if (hos_count[i + 1] != 0) {
 			result.distribution.insert(std::make_pair(
-						static_cast<int>(i) - cutf::experimental::fp::get_bias<T>(),
+						static_cast<int>(i) - cutf::experimental::fp::get_bias<typename base_t<T>::type>(),
 						hos_count[i + 1]
 						));
 		}
@@ -139,9 +148,15 @@ std::string mtk::cu_exp_statistics::to_json(
 		cudaStream_t cuda_stream \
 		)
 
-TAKE_MATRIX_STATISTICS_INSTANCE(half  );
-TAKE_MATRIX_STATISTICS_INSTANCE(float );
-TAKE_MATRIX_STATISTICS_INSTANCE(double);
-TAKE_VECTOR_STATISTICS_INSTANCE(half  );
-TAKE_VECTOR_STATISTICS_INSTANCE(float );
-TAKE_VECTOR_STATISTICS_INSTANCE(double);
+TAKE_MATRIX_STATISTICS_INSTANCE(half   );
+TAKE_MATRIX_STATISTICS_INSTANCE(float  );
+TAKE_MATRIX_STATISTICS_INSTANCE(double );
+TAKE_MATRIX_STATISTICS_INSTANCE(half2  );
+TAKE_MATRIX_STATISTICS_INSTANCE(float2 );
+TAKE_MATRIX_STATISTICS_INSTANCE(double2);
+TAKE_VECTOR_STATISTICS_INSTANCE(half   );
+TAKE_VECTOR_STATISTICS_INSTANCE(float  );
+TAKE_VECTOR_STATISTICS_INSTANCE(double );
+TAKE_VECTOR_STATISTICS_INSTANCE(half2  );
+TAKE_VECTOR_STATISTICS_INSTANCE(float2 );
+TAKE_VECTOR_STATISTICS_INSTANCE(double2);

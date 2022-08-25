@@ -7,6 +7,12 @@ cd cuda-exponent-distribution-statistics
 make
 ```
 
+## Supported data types
+- `float`
+- `double`
+- `cuComplex` (`float2`)
+- `cuDoubleComplex` (`double2`)
+
 ## Sample
 
 See [test code](./test/main.cu)
