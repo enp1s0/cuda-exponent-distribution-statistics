@@ -11,7 +11,8 @@ template <> struct base_t<double2> {using type = double;static const unsigned nu
 template <> struct base_t<float2 > {using type = float; static const unsigned num_elements = 2;};
 
 template <class T>
-void test(const std::size_t m, const std::size_t n) {
+void test_matrix(const std::size_t m, const std::size_t n) {
+	std::printf("# TEST (%s)\n", __func__);
 	const auto size = m * n * base_t<T>::num_elements;
 	std::mt19937 mt(std::random_device{}());
 	std::uniform_real_distribution<typename base_t<T>::type> dist(-10, 10);
@@ -42,9 +43,42 @@ void test(const std::size_t m, const std::size_t n) {
 	cudaFree(test_matrix_ptr);
 }
 
+void test_add_op(const std::size_t m0, const std::size_t m1) {
+	std::printf("# TEST (%s)\n", __func__);
+	std::mt19937 mt(std::random_device{}());
+	std::uniform_real_distribution<float> dist0(-1, 10);
+	std::uniform_real_distribution<float> dist1(-10, 1);
+
+	float* test_vec0_ptr;
+	float* test_vec1_ptr;
+	cudaMallocManaged(&test_vec0_ptr, sizeof(float) * m0);
+	cudaMallocManaged(&test_vec1_ptr, sizeof(float) * m1);
+	for (std::size_t i = 0; i < m0; i++) {
+		test_vec0_ptr[i] = dist0(mt);
+	}
+	for (std::size_t i = 0; i < m1; i++) {
+		test_vec1_ptr[i] = dist1(mt);
+	}
+	cudaDeviceSynchronize();
+
+	const auto result0 = mtk::cu_exp_statistics::take_vector_statistics(
+			test_vec0_ptr,
+			m0
+			);
+	const auto result1 = mtk::cu_exp_statistics::take_vector_statistics(
+			test_vec1_ptr,
+			m1
+			);
+	std::printf("VEC0: %s\n", mtk::cu_exp_statistics::to_json(result0).c_str());
+	std::printf("VEC1: %s\n", mtk::cu_exp_statistics::to_json(result1).c_str());
+	std::printf("VEC0 + VEC1: %s\n", mtk::cu_exp_statistics::to_json(result0 + result1).c_str());
+}
+
 int main() {
-	test<float  >(20000, 20000);
-	test<double >(20000, 20000);
-	test<float2 >(20000, 20000);
-	test<double2>(20000, 20000);
+	test_matrix<float  >(20000, 20000);
+	test_matrix<double >(20000, 20000);
+	test_matrix<float2 >(20000, 20000);
+	test_matrix<double2>(20000, 20000);
+
+	test_add_op(1000, 1000);
 }
