@@ -39,6 +39,8 @@ void test(const std::size_t m, const std::size_t n) {
 
 	std::printf("JSON: %s\n", mtk::cu_exp_statistics::to_json(result).c_str());
 
+	std::printf("JSON 2x: %s\n", mtk::cu_exp_statistics::to_json(result + result).c_str());
+
 	cudaFree(test_matrix_ptr);
 }
 
