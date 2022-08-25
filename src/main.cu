@@ -16,6 +16,9 @@ template <> struct base_t<double2> {using type = double;static const unsigned nu
 template <> struct base_t<float2 > {using type = float; static const unsigned num_elements = 2;};
 template <> struct base_t<half2  > {using type = half;  static const unsigned num_elements = 2;};
 
+// result_ptr format
+// [num_zero][num_nan][num_inf][ exp count ...]
+
 template <class T>
 __global__ void statistics_kernel(
 		count_t* const result_ptr,
