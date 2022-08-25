@@ -6,6 +6,8 @@ namespace cu_exp_statistics {
 
 struct result_t {
 	std::size_t num_zero = 0;
+	std::size_t num_inf = 0;
+	std::size_t num_nan = 0;
 	std::unordered_map<int, std::size_t> distribution;
 };
 

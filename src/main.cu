@@ -2,6 +2,7 @@
 #include <cu_exp_statistics.hpp>
 #include <cutf/experimental/fp.hpp>
 #include <cutf/memory.hpp>
+#include <cutf/math.hpp>
 
 namespace {
 using count_t = unsigned long long int;
@@ -14,6 +15,9 @@ struct base_t {
 template <> struct base_t<double2> {using type = double;static const unsigned num_elements = 2;};
 template <> struct base_t<float2 > {using type = float; static const unsigned num_elements = 2;};
 template <> struct base_t<half2  > {using type = half;  static const unsigned num_elements = 2;};
+
+// result_ptr format
+// [num_zero][num_nan][num_inf][ exp count ...]
 
 template <class T>
 __global__ void statistics_kernel(
@@ -37,6 +41,14 @@ __global__ void statistics_kernel(
 
 	if ((cutf::experimental::fp::reinterpret_as_uint(value) << 1) == 0) {
 		atomicAdd(result_ptr, 1lu);
+		return;
+	}
+	if (cutf::math::isnan(value)) {
+		atomicAdd(result_ptr + 1, 1lu);
+		return;
+	}
+	if (cutf::math::isinf(value)) {
+		atomicAdd(result_ptr + 2, 1lu);
 		return;
 	}
 
@@ -83,7 +95,7 @@ mtk::cu_exp_statistics::result_t mtk::cu_exp_statistics::take_matrix_statistics(
 		) {
 	const std::size_t ld = ld_ == 0 ? m : ld_;
 
-	const std::size_t statistics_array_size = (1lu << cutf::experimental::fp::get_exponent_size<typename base_t<T>::type>()) + 1;
+	const std::size_t statistics_array_size = (1lu << cutf::experimental::fp::get_exponent_size<typename base_t<T>::type>()) + 3;
 	count_t *dev_count;
 	count_t *hos_count;
 	CUTF_CHECK_ERROR(cudaMalloc(&dev_count, sizeof(count_t) * statistics_array_size));
@@ -101,12 +113,14 @@ mtk::cu_exp_statistics::result_t mtk::cu_exp_statistics::take_matrix_statistics(
 
 	mtk::cu_exp_statistics::result_t result;
 	result.num_zero = hos_count[0];
+	result.num_nan  = hos_count[1];
+	result.num_inf  = hos_count[2];
 
 	for (std::uint32_t i = 0; i < (1u << cutf::experimental::fp::get_exponent_size<typename base_t<T>::type>()); i++) {
-		if (hos_count[i + 1] != 0) {
+		if (hos_count[i + 3] != 0) {
 			result.distribution.insert(std::make_pair(
 						static_cast<int>(i) - cutf::experimental::fp::get_bias<typename base_t<T>::type>(),
-						hos_count[i + 1]
+						hos_count[i + 3]
 						));
 		}
 	}
@@ -122,6 +136,8 @@ std::string mtk::cu_exp_statistics::to_json(
 		) {
 	std::string str = "{";
 	str += "num_zero:" + std::to_string(result.num_zero);
+	str += ",num_nan:" + std::to_string(result.num_nan);
+	str += ",num_inf:" + std::to_string(result.num_inf);
 
 	for (int exp = -10000; exp <= 10000; exp++) {
 		if (result.distribution.count(exp) != 0) {

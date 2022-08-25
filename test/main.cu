@@ -28,6 +28,8 @@ void test(const std::size_t m, const std::size_t n) {
 			m, n
 			);
 	std::printf("# zero = %lu\n", result.num_zero);
+	std::printf("# inf = %lu\n", result.num_inf);
+	std::printf("# nan = %lu\n", result.num_nan);
 	for (int exp = -2048; exp <= 2048; exp++) {
 		if (result.distribution.count(exp) != 0) {
 			std::size_t count = result.distribution.at(exp);
