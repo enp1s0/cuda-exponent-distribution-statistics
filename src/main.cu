@@ -135,9 +135,9 @@ std::string mtk::cu_exp_statistics::to_json(
 		const mtk::cu_exp_statistics::result_t& result
 		) {
 	std::string str = "{";
-	str += "num_zero:" + std::to_string(result.num_zero);
-	str += ",num_nan:" + std::to_string(result.num_nan);
-	str += ",num_inf:" + std::to_string(result.num_inf);
+	str += "\"num_zero\":" + std::to_string(result.num_zero);
+	str += ",\"num_nan\":" + std::to_string(result.num_nan);
+	str += ",\"num_inf\":" + std::to_string(result.num_inf);
 
 	for (int exp = -10000; exp <= 10000; exp++) {
 		if (result.distribution.count(exp) != 0) {

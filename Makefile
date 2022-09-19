@@ -19,8 +19,10 @@ obj/main.dlink.o:obj/main.o
 	mkdir -p obj
 	$(NVCC) $< -o $@ $(NVCCFLAGS) -dlink
 
-test: test/main.cu $(TARGET)
-	$(NVCC) $+ -o $@.out $(NVCCFLAGS)
+test: test.out
+
+test.out: test/main.cu $(TARGET)
+	$(NVCC) $+ -o $@ $(NVCCFLAGS)
   
 clean:
 	rm -rf $(TARGET) obj
